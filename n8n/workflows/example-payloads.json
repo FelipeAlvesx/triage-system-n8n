@@ -1,0 +1,130 @@
+{
+  "examples": [
+    {
+      "name": "Caso de Emergência - Dor no Peito",
+      "payload": {
+        "symptoms": [
+          "dor no peito intensa",
+          "falta de ar",
+          "suor frio",
+          "dor irradiando para braço esquerdo"
+        ],
+        "patientInfo": {
+          "age": 55,
+          "gender": "masculino",
+          "chronicConditions": ["diabetes", "hipertensão"]
+        },
+        "additionalNotes": "Dor começou há 30 minutos, muito intensa, escala 9/10"
+      },
+      "expected_classification": "EMERGÊNCIA"
+    },
+    {
+      "name": "Caso Urgente - Febre Alta",
+      "payload": {
+        "symptoms": [
+          "febre de 39.5°C",
+          "dor de cabeça severa",
+          "rigidez no pescoço",
+          "sensibilidade à luz"
+        ],
+        "patientInfo": {
+          "age": 28,
+          "gender": "feminino",
+          "chronicConditions": []
+        },
+        "additionalNotes": "Sintomas iniciaram hoje pela manhã e pioraram rapidamente"
+      },
+      "expected_classification": "URGENTE"
+    },
+    {
+      "name": "Caso Prioritário - Infecção Urinária",
+      "payload": {
+        "symptoms": [
+          "dor ao urinar",
+          "vontade frequente de urinar",
+          "febre baixa 37.8°C",
+          "dor lombar"
+        ],
+        "patientInfo": {
+          "age": 42,
+          "gender": "feminino",
+          "chronicConditions": []
+        },
+        "additionalNotes": "Sintomas há 2 dias, desconforto aumentando"
+      },
+      "expected_classification": "PRIORITÁRIO"
+    },
+    {
+      "name": "Caso Não Urgente - Resfriado Comum",
+      "payload": {
+        "symptoms": [
+          "coriza",
+          "espirros",
+          "leve dor de garganta",
+          "cansaço"
+        ],
+        "patientInfo": {
+          "age": 30,
+          "gender": "masculino",
+          "chronicConditions": []
+        },
+        "additionalNotes": "Sintomas leves há 3 dias, sem febre"
+      },
+      "expected_classification": "NÃO URGENTE"
+    },
+    {
+      "name": "Caso Complexo - Múltiplos Sintomas",
+      "payload": {
+        "symptoms": [
+          "tosse seca persistente",
+          "febre intermitente 38°C",
+          "fadiga extrema",
+          "perda de apetite",
+          "dor muscular"
+        ],
+        "patientInfo": {
+          "age": 65,
+          "gender": "masculino",
+          "chronicConditions": ["DPOC", "hipertensão", "diabetes tipo 2"]
+        },
+        "additionalNotes": "Paciente idoso com comorbidades, sintomas há 5 dias. Tosse piorou nos últimos 2 dias."
+      },
+      "expected_classification": "URGENTE"
+    },
+    {
+      "name": "Caso Pediátrico - Criança com Febre",
+      "payload": {
+        "symptoms": [
+          "febre 38.5°C",
+          "irritabilidade",
+          "choro persistente",
+          "recusa alimentar"
+        ],
+        "patientInfo": {
+          "age": 2,
+          "gender": "feminino",
+          "chronicConditions": []
+        },
+        "additionalNotes": "Criança de 2 anos, febre há 24h, não melhora com antitérmico"
+      },
+      "expected_classification": "URGENTE"
+    },
+    {
+      "name": "Caso Mínimo - Dados Básicos",
+      "payload": {
+        "symptoms": ["dor de cabeça"],
+        "patientInfo": {
+          "age": 25,
+          "gender": "feminino"
+        },
+        "additionalNotes": ""
+      },
+      "expected_classification": "NÃO URGENTE"
+    }
+  ],
+  "test_instructions": {
+    "curl_example": "curl -X POST https://seu-n8n.com/webhook/medical-triage \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"symptoms\": [\"febre\", \"tosse\"], \"patientInfo\": {\"age\": 30, \"gender\": \"masculino\"}, \"additionalNotes\": \"Sintomas há 2 dias\"}'",
+    "postman_collection": "Importe os exemplos acima no Postman para testes",
+    "automated_testing": "Use estes payloads para criar testes automatizados na sua API NestJS"
+  }
+}
