@@ -44,7 +44,6 @@ export class TriageService {
 
     async triage(body: TriageRequest): Promise<TriageResponse> {
         const startedAt = Date.now();
-
         this.validatePayload(body);
 
         console.log('[TriageService] Chamando n8n webhook:', this.webhookUrl);
@@ -70,7 +69,6 @@ export class TriageService {
                 }
             }
         }
-
         // Fallback rapido para manter boa experiencia mesmo com n8n indisponivel.
         const fallback = this.buildFallback(startedAt, this.maxAttempts);
 
