@@ -1,98 +1,138 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Triage App API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API de triagem medica com NestJS integrada ao n8n.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Visao Geral
 
-## Description
+Este projeto recebe sintomas via API, envia para um workflow no n8n, o n8n consulta um modelo de IA no GROQ e retorna uma classificacao de triagem.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Fluxo principal:
 
-## Project setup
+1. Cliente chama `POST /triage` na API Nest.
+2. API Nest encaminha payload para webhook do n8n.
+3. n8n processa com GROQ e responde JSON de triagem.
+4. API responde ao cliente com o resultado.
 
-```bash
-$ npm install
+## Stack
+
+- NestJS 11
+- TypeScript
+- n8n (workflow HTTP webhook)
+- GROQ (chat completions)
+
+## Estrutura
+
+```text
+src/
+  triage/
+    triage.controller.ts
+    triage.service.ts
+    triage.module.ts
+n8n/
+  workflows/
+    medical-triage-workflow.json
+    README.md
+  GROQ_SETUP.md
 ```
 
-## Compile and run the project
+## Requisitos
+
+- Node.js 20+
+- npm
+- Instancia n8n ativa
+- API key do GROQ
+
+## Setup Local
+
+1. Instale dependencias:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
 ```
 
-## Run tests
+2. Configure variaveis em `.env` na raiz do projeto:
+
+```env
+N8N_WEBHOOK_URL=https://seu-n8n.com/webhook/medical-triage
+N8N_TIMEOUT_MS=3500
+N8N_MAX_ATTEMPTS=2
+TRIAGE_STRICT_MODE=false
+```
+
+3. Rode em desenvolvimento:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm run start:dev
 ```
 
-## Deployment
+API padrao em `http://localhost:3000`.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Configuracao do n8n
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+1. Importe `n8n/workflows/medical-triage-workflow.json`.
+2. Configure a credencial do GROQ no node `AI Medical Analysis (GROQ)`.
+3. Ative o workflow.
+4. Use a URL de producao (`/webhook/...`) no `N8N_WEBHOOK_URL`.
+
+Documentacao detalhada:
+
+- `n8n/workflows/README.md`
+- `n8n/GROQ_SETUP.md`
+
+## Endpoint da API
+
+### `POST /triage`
+
+Exemplo de payload:
+
+```json
+{
+  "symptoms": ["febre alta", "dor de cabeca intensa", "nausea"],
+  "patientInfo": {
+    "age": 35,
+    "gender": "feminino",
+    "chronicConditions": ["hipertensao"]
+  },
+  "additionalNotes": "Sintomas ha 2 dias, piorando nas ultimas 12 horas"
+}
+```
+
+Exemplo de chamada:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+curl -X POST http://localhost:3000/triage \
+  -H "Content-Type: application/json" \
+  -d '{
+    "symptoms": ["febre alta", "dor de cabeca intensa", "nausea"],
+    "patientInfo": {"age": 35, "gender": "feminino"},
+    "additionalNotes": "Sintomas ha 2 dias"
+  }'
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Comportamento de Resiliencia
 
-## Resources
+`TriageService` implementa:
 
-Check out a few resources that may come in handy when working with NestJS:
+- timeout configuravel (`N8N_TIMEOUT_MS`)
+- retry curto (`N8N_MAX_ATTEMPTS`)
+- fallback quando n8n falha (se `TRIAGE_STRICT_MODE=false`)
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Quando `TRIAGE_STRICT_MODE=true`, a API retorna erro HTTP em vez de fallback.
 
-## Support
+## Scripts
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```bash
+npm run start
+npm run start:dev
+npm run build
+npm run test
+npm run test:e2e
+npm run lint
+```
 
-## Stay in touch
+## Troubleshooting Rapido
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- Retorno em fallback: valide URL de webhook, workflow ativo e credencial GROQ.
+- `webhook-test` nao funciona em producao: use `/webhook/...`.
+- Erro de modelo no GROQ: troque o `model` no workflow para um modelo ativo.
+- Resposta vazia: verifique se o fluxo chega ao node `Respond to API` no n8n.

@@ -46,13 +46,10 @@ export class TriageService {
         const startedAt = Date.now();
         this.validatePayload(body);
 
-        console.log('[TriageService] Chamando n8n webhook:', this.webhookUrl);
-
         let lastError: unknown;
         for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
             try {
                 const data = await this.callN8n(body, this.timeoutMs);
-                console.log('[TriageService] Sucesso na tentativa', attempt);
                 return {
                     ...data,
                     metadata: {
@@ -62,7 +59,7 @@ export class TriageService {
                     },
                 };
             } catch (error) {
-                console.error(`[TriageService] Erro na tentativa ${attempt}:`, error);
+                console.error(`[Triage] Attempt ${attempt}/${this.maxAttempts} failed:`, error instanceof Error ? error.message : String(error));
                 lastError = error;
                 if (attempt < this.maxAttempts) {
                     await this.sleep(80 * attempt);
@@ -71,6 +68,7 @@ export class TriageService {
         }
         // Fallback rapido para manter boa experiencia mesmo com n8n indisponivel.
         const fallback = this.buildFallback(startedAt, this.maxAttempts);
+        console.warn('[Triage] All attempts failed, returning fallback response');
 
         if (process.env.TRIAGE_STRICT_MODE === 'true') {
             const isTimeout =
@@ -99,21 +97,22 @@ export class TriageService {
                 signal: controller.signal,
             });
 
-            console.log('[TriageService] Status HTTP:', res.status);
-            console.log('[TriageService] Headers:', Object.fromEntries(res.headers.entries()));
-
             const responseText = await res.text();
-            console.log('[TriageService] Corpo da resposta:', responseText.substring(0, 500));
 
             if (!res.ok) {
-                throw new Error(`n8n respondeu com status ${res.status}: ${responseText}`);
+                throw new Error(`HTTP ${res.status}: ${responseText.substring(0, 200)}`);
             }
 
             if (!responseText || responseText.trim() === '') {
-                throw new Error('n8n retornou corpo vazio');
+                throw new Error('Empty response from n8n');
             }
 
-            return JSON.parse(responseText) as TriageResponse;
+            try {
+                const parsed = JSON.parse(responseText) as TriageResponse;
+                return parsed;
+            } catch (parseError) {
+                throw new Error(`Invalid JSON: ${String(parseError)}`);
+            }
         } finally {
             clearTimeout(timeout);
         }

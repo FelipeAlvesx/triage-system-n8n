@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Validar e preparar dados recebidos\nconst inputData = $input.item.json;\n\n// Extrair sintomas e dados do paciente\nconst symptoms = inputData.symptoms || [];\nconst patientInfo = inputData.patientInfo || {};\nconst additionalNotes = inputData.additionalNotes || '';\n\n// Construir contexto para IA\nconst symptomsList = Array.isArray(symptoms) \n  ? symptoms.join(', ') \n  : symptoms;\n\nconst patientContext = `\nPaciente: ${patientInfo.age || 'Idade não informada'} anos, ${patientInfo.gender || 'Sexo não informado'}\nSintomas relatados: ${symptomsList}\nObservações adicionais: ${additionalNotes}\n`;\n\n// Preparar body para GROQ\nconst groqBody = {\n  model: \"llama-3.3-70b-versatile\",\n  messages: [\n    {\n      role: \"system\",\n      content: `Você é um assistente médico especializado em triagem inicial de pacientes. Sua função é:\n\n1. Analisar os sintomas relatados pelo paciente\n2. Avaliar a gravidade da situação\n3. Fornecer uma classificação de urgência (EMERGÊNCIA, URGENTE, PRIORITÁRIO, NÃO URGENTE)\n4. Sugerir encaminhamentos apropriados\n5. Dar orientações gerais (sem substituir consulta médica)\n\nIMPORTANTE: Você não substitui um médico. Em casos graves, sempre recomende buscar atendimento imediato.\n\nSua resposta deve ser estruturada no seguinte formato JSON:\n{\n  \"classification\": \"EMERGÊNCIA|URGENTE|PRIORITÁRIO|NÃO URGENTE\",\n  \"severity_score\": 1-10,\n  \"analysis\": \"Análise dos sintomas\",\n  \"recommendations\": [\"lista de recomendações\"],\n  \"red_flags\": [\"sinais de alerta identificados\"],\n  \"suggested_specialty\": \"Especialidade médica recomendada\",\n  \"requires_immediate_attention\": true/false\n}`\n    },\n    {\n      role: \"user\",\n      content: patientContext\n    }\n  ],\n  temperature: 0.3,\n  max_tokens: 1000\n};\n\nreturn {\n  symptoms: symptomsList,\n  patientInfo: patientInfo,\n  additionalNotes: additionalNotes,\n  patientContext: patientContext,\n  groqBody: groqBody,\n  timestamp: new Date().toISOString()\n};"
+        "jsCode": "// Validar e preparar dados recebidos\nconst inputData = $input.item.json;\n\n// Extrair sintomas e dados do paciente\nconst symptoms = inputData.symptoms || [];\nconst patientInfo = inputData.patientInfo || {};\nconst additionalNotes = inputData.additionalNotes || inputData.notes || '';\n\n// Construir contexto para IA\nconst symptomsList = Array.isArray(symptoms) \n  ? symptoms.join(', ') \n  : symptoms;\n\nconst patientContext = `\nPaciente: ${patientInfo.age || 'Idade não informada'} anos, ${patientInfo.gender || 'Sexo não informado'}\nHistórico Médico: ${patientInfo.medicalHistory?.join(', ') || patientInfo.chronicConditions?.join(', ') || 'Não informado'}\nSintomas relatados: ${symptomsList}\nObservações adicionais: ${additionalNotes}\n`;\n\n// Preparar body para GROQ\nconst groqBody = {\n  model: \"llama-3.3-70b-versatile\",\n  messages: [\n    {\n      role: \"system\",\n      content: `Você é um médico de emergência especializado em triagem. ANALISE CUIDADOSAMENTE os sintomas fornecidos.\n\n**EMERGÊNCIA** (Score 8-10) - AMEAÇA IMEDIATA À VIDA:\n→ INFARTO DO MIOCÁRDIO: dor no peito + irradiação para braço/mandíbula + falta de ar + suor frio\n→ AVC: paralisia súbita, perda de fala, perda de coordenação\n→ Convulsões ativas, sangramento descontrolado, perda de consciência\n→ Dispneia severa com cianose\n\n**URGENTE** (Score 6-7):\n→ Dor torácica severa sem todos os critérios de infarto\n→ Trauma moderado/grave, queimaduras extensas\n→ Febre > 40°C com sintomas graves\n\n**PRIORITÁRIO** (Score 4-5):\n→ Dor moderada, infecções leves\n→ Sintomas crônicos agudizados\n\n**NÃO URGENTE** (Score 1-3):\n→ Sintomas leves e estáveis\n\nRESPONDA APENAS COM JSON VÁLIDO contendo: classification (EMERGÊNCIA|URGENTE|PRIORITÁRIO|NÃO_URGENTE), severity_score (1-10), analysis (texto), recommendations (array), red_flags (array), suggested_specialty (texto), requires_immediate_attention (boolean)`\n    },\n    {\n      role: \"user\",\n      content: patientContext\n    }\n  ],\n  temperature: 0.7,\n  max_tokens: 2000\n};\n\nreturn {\n  symptoms: symptoms,\n  patientInfo: patientInfo,\n  additionalNotes: additionalNotes,\n  patientContext: patientContext,\n  groqBody: groqBody,\n  timestamp: new Date().toISOString()\n};"
       },
       "id": "prepare-data-node",
       "name": "Prepare Data",
@@ -50,7 +50,17 @@
     },
     {
       "parameters": {
-        "jsCode": "// Processar resposta da IA (GROQ) e estruturar dados finais\nconst groqResponse = $input.item.json;\nconst aiResponse = groqResponse.choices?.[0]?.message?.content || groqResponse.message?.content || groqResponse.text;\nconst inputData = $input.first().json;\n\nlet parsedAnalysis;\ntry {\n  // Tentar extrair JSON da resposta\n  const jsonMatch = aiResponse.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    parsedAnalysis = JSON.parse(jsonMatch[0]);\n  } else {\n    // Se não houver JSON, criar estrutura padrão\n    parsedAnalysis = {\n      classification: \"PRIORITÁRIO\",\n      severity_score: 5,\n      analysis: aiResponse,\n      recommendations: [\"Consultar um médico para avaliação completa\"],\n      red_flags: [],\n      suggested_specialty: \"Clínico Geral\",\n      requires_immediate_attention: false\n    };\n  }\n} catch (error) {\n  parsedAnalysis = {\n    classification: \"PRIORITÁRIO\",\n    severity_score: 5,\n    analysis: aiResponse,\n    recommendations: [\"Consultar um médico para avaliação completa\"],\n    red_flags: [],\n    suggested_specialty: \"Clínico Geral\",\n    requires_immediate_attention: false\n  };\n}\n\n// Montar resposta final\nconst response = {\n  success: true,\n  timestamp: new Date().toISOString(),\n  patient_data: {\n    symptoms: inputData.symptoms,\n    patient_info: inputData.patientInfo\n  },\n  triage_result: parsedAnalysis,\n  metadata: {\n    processed_at: new Date().toISOString(),\n    workflow_version: \"1.0.0\",\n    model: \"GROQ - Llama 3.3 70B\"\n  }\n};\n\nreturn response;"
+        "jsCode": "// Preservar dados originais - acesso correto ao nó anterior\nconst groqResponse = $input.item.json;\nconst prepareData = $('Prepare Data').item.json;\n\nreturn {\n  ...groqResponse,\n  _original_patient_data: {\n    symptoms: prepareData.symptoms || [],\n    patientInfo: prepareData.patientInfo || {}\n  }\n};"
+      },
+      "id": "preserve-data-node",
+      "name": "Preserve Original Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar resposta da IA (GROQ) e estruturar dados finais\nconst groqResponse = $input.item.json;\nconst aiResponse = groqResponse.choices?.[0]?.message?.content || groqResponse.message?.content || groqResponse.text || '';\n\n// Recuperar dados originais preservados\nconst originalPatientData = groqResponse._original_patient_data || {};\n\nlet parsedAnalysis;\ntry {\n  // Tentar extrair JSON da resposta\n  const jsonMatch = aiResponse.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    parsedAnalysis = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found');\n  }\n} catch (error) {\n  // Fallback: estrutura padrão com análise\n  parsedAnalysis = {\n    classification: \"PRIORITÁRIO\",\n    severity_score: 5,\n    analysis: aiResponse || \"Não foi possível processar a resposta. Por favor, busque atendimento médico.\",\n    recommendations: [\"Consultar um médico para avaliação completa\"],\n    red_flags: [],\n    suggested_specialty: \"Clínico Geral\",\n    requires_immediate_attention: false\n  };\n}\n\n// Montar resposta final com dados originais\nconst response = {\n  success: true,\n  timestamp: new Date().toISOString(),\n  patient_data: {\n    symptoms: originalPatientData.symptoms || [],\n    patient_info: originalPatientData.patientInfo || {}\n  },\n  triage_result: parsedAnalysis,\n  metadata: {\n    processed_at: new Date().toISOString(),\n    workflow_version: \"1.0.1\",\n    model: \"GROQ - Llama 3.3 70B\"\n  }\n};\n\nreturn response;"
       },
       "id": "format-response-node",
       "name": "Format Response",
@@ -136,6 +146,17 @@
       ]
     },
     "AI Medical Analysis (GROQ)": {
+      "main": [
+        [
+          {
+            "node": "Preserve Original Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preserve Original Data": {
       "main": [
         [
           {
